@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interview  - Florian Bahr</title>
+    <title>Interview - Florian Bahr</title>
     <style>
         body, html {
             margin: 0;
@@ -86,13 +86,29 @@
         <button id="contactButton" class="button" onclick="contactFlorian()">Contact Florian</button>
         <button id="cvButton" class="button" onclick="viewCV()">View CV</button>
     </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script>
+
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
         const skillsList = document.getElementById("skillsList");
         const currentScoreElement = document.getElementById("currentScore");
         const highScoreElement = document.getElementById("highScore");
         const multiplierElement = document.getElementById("multiplier");
+        const firebaseConfig = {
+            apiKey: "AIzaSyDbu8hLgedV3NPvpXTR4vAA3pNEFn2n1v4",
+            authDomain: "virtual-interview-leaderboard.firebaseapp.com",
+            databaseURL: "https://virtual-interview-leaderboard-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "virtual-interview-leaderboard",
+            storageBucket: "virtual-interview-leaderboard.appspot.com",
+            messagingSenderId: "1010684031955",
+            appId: "1:1010684031955:web:fe51f85c1231be67843526",
+            measurementId: "G-K08HETG2BR"
+};
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -103,6 +119,7 @@
         const droneWidth = 170;
         const droneHeight = 40;
         let droneX = canvas.width / 2 - droneWidth / 2;
+        let droneSpeed = 10;
         let ballX = canvas.width / 2;
         let ballY = canvas.height - 100;
         let ballRadius = 8;
@@ -111,8 +128,7 @@
         let ballSpeedY = -initialBallSpeed;
         let currentMultiplier = 1;
         let skillBlocksHitInARow = 0;
-
-        const brickRowCount = 6;
+        let brickRowCount = 6;
         
         const brickColumnCount = 8;
         const brickWidth = (flightZoneWidth - 100) / brickColumnCount;
@@ -138,7 +154,7 @@
             "#FFB3BA", "#BAFFC9", "#BAE1FF", "#FFFFBA", "#FFDFBA", "#E0BBE4"
         ];
 
-        const bricks = [];
+        let bricks = [];
         let totalBricks = brickRowCount * brickColumnCount;
         let bricksDestroyed = 0;
         let currentScore = 0;
@@ -201,6 +217,17 @@
             });
         }
 
+        function moveDrone(direction) {
+    if (direction === 'left') {
+        droneX -= droneSpeed;
+    } else if (direction === 'right') {
+        droneX += droneSpeed;
+    }
+
+    // Ensure the drone stays within the flight zone
+    droneX = Math.max(flightZoneX, Math.min(droneX, flightZoneX + flightZoneWidth - droneWidth));
+}
+
         function drawFlightZone() {
             ctx.strokeStyle = "#FFFFFF";
             ctx.lineWidth = 2;
@@ -216,6 +243,26 @@
             ctx.fillText("Job Interview", canvas.width / 2 - 50, 30);
         }
 
+        function moveDrone(direction) {
+            if (direction === 'left') {
+                droneX -= droneSpeed;
+            } else if (direction === 'right') {
+                droneX += droneSpeed;
+            }
+
+            // Ensure the drone stays within the flight zone
+            if (droneX < flightZoneX) droneX = flightZoneX;
+            if (droneX + droneWidth > flightZoneX + flightZoneWidth) droneX = flightZoneX + flightZoneWidth - droneWidth;
+        }
+
+        function handleKeyDown(e) {
+            if (e.key === 'ArrowLeft') {
+                moveDrone('left');
+            } else if (e.key === 'ArrowRight') {
+                moveDrone('right');
+            }
+        }
+
         function drawDrone() {
             if (droneImage.complete) {
                 ctx.drawImage(droneImage, droneX, canvas.height - droneHeight, droneWidth, droneHeight);
@@ -224,7 +271,6 @@
                 ctx.fillRect(droneX, canvas.height - droneHeight, droneWidth, droneHeight);
             }
         }
-
 
         function drawStar(ctx, x, y, size) {
             ctx.save();
@@ -241,7 +287,6 @@
             ctx.restore();
         }
 
-        
         function drawBall() {
             ctx.beginPath();
             ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
@@ -251,7 +296,7 @@
 
         function drawBricks() {
             for(let c = 0; c < brickColumnCount; c++) {
-                for(let r = 0; r < brickRowCount; r++) {
+                for(let r = 0; r < bricks[c].length; r++) {
                     if(bricks[c][r].status == 1) {
                         const brickX = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
                         const brickY = (r * (brickHeight + brickPadding)) + brickOffsetTop;
@@ -265,7 +310,6 @@
                         ctx.closePath();
 
                         if (bricks[c][r].skill) {
-                            // Add glow effect
                             ctx.shadowColor = bricks[c][r].color;
                             ctx.shadowBlur = 15;
                             ctx.beginPath();
@@ -275,7 +319,6 @@
                             ctx.closePath();
                             ctx.shadowBlur = 0;
 
-                            // Add star symbol
                             ctx.fillStyle = "white";
                             drawStar(ctx, brickX + brickWidth / 2, brickY + brickHeight / 2, brickHeight / 2);
                         }
@@ -285,15 +328,16 @@
         }
 
         function collisionDetection() {
+            let allBricksDestroyed = true;
             for(let c = 0; c < brickColumnCount; c++) {
-                for(let r = 0; r < brickRowCount; r++) {
+                for(let r = 0; r < bricks[c].length; r++) {
                     const b = bricks[c][r];
                     if(b.status == 1) {
+                        allBricksDestroyed = false;
                         if(ballX > b.x && ballX < b.x + brickWidth && ballY > b.y && ballY < b.y + brickHeight) {
                             ballSpeedY = -ballSpeedY;
                             b.status = 0;
                             bricksDestroyed++;
-
                             if(b.skill) {
                                 skillBlocksHitInARow++;
                                 let newMultiplier = Math.min(5, 1 + Math.floor(skillBlocksHitInARow / 2));
@@ -319,8 +363,59 @@
                     }
                 }
             }
+
+            if (allBricksDestroyed) {
+                generateNewLevel();
+            }
         }
 
+        function generateNewLevel() {
+            brickRowCount++;
+            bricks = generateBricks(brickRowCount);
+            totalBricks = brickRowCount * brickColumnCount;
+            bricksDestroyed = 0;
+            ballX = canvas.width / 2;
+            ballY = canvas.height - 100;
+            ballSpeedX = initialBallSpeed;
+            ballSpeedY = -initialBallSpeed;
+            requestAnimationFrame(draw);
+        }
+
+        function generateBricks(rowCount) {
+    const newBricks = [];
+    const totalBricks = rowCount * brickColumnCount;
+    const skillBrickCount = Math.min(skills.length, Math.floor(totalBricks * 0.5));
+    
+    // Create an array of all possible brick positions and shuffle it
+    const allPositions = Array.from({length: totalBricks}, (_, i) => i);
+    const shuffledPositions = allPositions.sort(() => Math.random() - 0.5);
+    
+    // Select the first skillBrickCount positions for skill bricks
+    const skillPositions = shuffledPositions.slice(0, skillBrickCount);
+    
+    // Shuffle the skills array
+    const shuffledSkills = [...skills].sort(() => Math.random() - 0.5);
+
+    let skillIndex = 0;
+    let brickIndex = 0;
+
+    for(let c = 0; c < brickColumnCount; c++) {
+        newBricks[c] = [];
+        for(let r = 0; r < rowCount; r++) {
+            const hasSkill = skillPositions.includes(brickIndex);
+            newBricks[c][r] = { 
+                x: 0, 
+                y: 0, 
+                status: 1, 
+                skill: hasSkill ? shuffledSkills[skillIndex % shuffledSkills.length] : null,
+                color: hasSkill ? pastelColors[Math.floor(Math.random() * pastelColors.length)] : "#CCCCCC"
+            };
+            if (hasSkill) skillIndex++;
+            brickIndex++;
+        }
+    }
+    return newBricks;
+}
         function showMultiplierEffect(newMultiplier) {
             multiplierElement.style.fontSize = '24px';
             multiplierElement.style.color = '#FFD700';
@@ -354,20 +449,74 @@
             ballSpeedY *= speedIncrease;
         }
 
+        function loadLeaderboard() {
+            const leaderboardRef = database.ref('leaderboard').orderByChild('score').limitToLast(10);
+            leaderboardRef.once('value').then((snapshot) => {
+                const leaderboardData = [];
+                snapshot.forEach((childSnapshot) => {
+                    leaderboardData.unshift(childSnapshot.val());
+                });
+                displayLeaderboard(leaderboardData);
+            }).catch(error => console.error("Error loading leaderboard:", error));
+        }
+
+        function updateLeaderboard(company, score) {
+            database.ref('leaderboard').push({
+                company: company,
+                score: score
+            }).catch(error => console.error("Error updating leaderboard:", error));
+        }
+
+        function displayLeaderboard(leaderboardData) {
+            // Remove existing leaderboard if any
+            const existingLeaderboard = document.getElementById('leaderboardContainer');
+            if (existingLeaderboard) existingLeaderboard.remove();
+
+            const leaderboardContainer = document.createElement('div');
+            leaderboardContainer.id = 'leaderboardContainer';
+            leaderboardContainer.style.cssText = `
+                position: absolute;
+                bottom: 20px;
+                right: 20px;
+                width: 300px;
+                height: 400px;
+                background-color: rgba(0, 0, 0, 0.8);
+                color: white;
+                padding: 20px;
+                overflow-y: auto;
+                display: flex;
+                flex-direction: column;
+            `;
+
+            const leaderboardTitle = document.createElement('h2');
+            leaderboardTitle.textContent = 'Leaderboard';
+            leaderboardContainer.appendChild(leaderboardTitle);
+
+            const leaderboardList = document.createElement('ol');
+            leaderboardData.forEach(entry => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `${entry.company}: ${entry.score}`;
+                leaderboardList.appendChild(listItem);
+            });
+            leaderboardContainer.appendChild(leaderboardList);
+
+            document.body.appendChild(leaderboardContainer);
+        }
+
         function draw() {
             if (gameOver) return;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#1E82B4";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+
             drawStars();
             drawFlightZone();
             drawBricks();
             drawBall();
             drawDrone();
             collisionDetection();
-            
+
             if(ballX + ballSpeedX > flightZoneX + flightZoneWidth - ballRadius || ballX + ballSpeedX < flightZoneX + ballRadius) {
                 ballSpeedX = -ballSpeedX;
             }
@@ -379,38 +528,72 @@
                     let hitPos = (ballX - droneX) / droneWidth;
                     ballSpeedX = 8 * (hitPos - 0.5);
                 } else {
-                    gameOver = true;
-                    if(currentScore > highScore) {
-                        highScore = currentScore;
-                        highScoreElement.textContent = highScore;
-                        localStorage.setItem('highScore', highScore);
-                    }
-                    ctx.font = "30px Arial";
-                    ctx.fillStyle = "#FFFFFF";
-                    ctx.fillText("Game Over - Click to Restart", canvas.width/2 - 180, canvas.height/2);
+                    handleGameOver();
+                    return;
                 }
             }
-            
+
             ballX += ballSpeedX;
             ballY += ballSpeedY;
-            
+
             requestAnimationFrame(draw);
         }
 
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            droneX = e.clientX - rect.left - droneWidth / 2;
-            if(droneX < flightZoneX) droneX = flightZoneX;
-            if(droneX + droneWidth > flightZoneX + flightZoneWidth) droneX = flightZoneX + flightZoneWidth - droneWidth;
-        });
+        function handleGameOver() {
+            gameOver = true;
+            if(currentScore > highScore) {
+                highScore = currentScore;
+                highScoreElement.textContent = highScore;
+                localStorage.setItem('highScore', highScore);
+            }
+            ctx.font = "30px Arial";
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillText("Game Over - Click to Restart", canvas.width/2 - 180, canvas.height/2);
+
+            // Show leaderboard and input for company name
+            const companyInput = document.createElement('input');
+            companyInput.type = 'text';
+            companyInput.id = 'companyInput';
+            companyInput.placeholder = 'Enter your company name';
+            companyInput.style.position = 'absolute';
+            companyInput.style.top = `${canvas.height/2 + 50}px`;
+            companyInput.style.left = `${canvas.width/2 - 100}px`;
+            document.body.appendChild(companyInput);
+
+            const submitButton = document.createElement('button');
+            submitButton.textContent = 'Submit Score';
+            submitButton.id = 'submitButton';
+            submitButton.style.position = 'absolute';
+            submitButton.style.top = `${canvas.height/2 + 80}px`;
+            submitButton.style.left = `${canvas.width/2 - 55}px`;
+            submitButton.addEventListener('click', () => {
+                const company = companyInput.value.trim();
+                if (company) {
+                    updateLeaderboard(company, currentScore);
+                    companyInput.remove();
+                    submitButton.remove();
+                    loadLeaderboard();
+                }
+            });
+            document.body.appendChild(submitButton);
+        }
 
         canvas.addEventListener('click', () => {
             if (gameOver) {
                 gameOver = false;
+                const leaderboardContainer = document.getElementById('leaderboardContainer');
+                if (leaderboardContainer) leaderboardContainer.remove();
+                const companyInput = document.getElementById('companyInput');
+                if (companyInput) companyInput.remove();
+                const submitButton = document.getElementById('submitButton');
+                if (submitButton) submitButton.remove();
                 ballX = canvas.width / 2;
                 ballY = canvas.height - 100;
                 ballSpeedX = initialBallSpeed;
                 ballSpeedY = -initialBallSpeed;
+                brickRowCount = 6;
+                bricks = generateBricks(brickRowCount);
+                totalBricks = brickRowCount * brickColumnCount;
                 bricksDestroyed = 0;
                 currentScore = 0;
                 currentScoreElement.textContent = currentScore;
@@ -420,27 +603,18 @@
                 multiplierElement.textContent = `Multiplier: x1`;
                 updateSkillsList();
                 updateMultiplierDisplay();
-                
-                // Reset bricks and redistribute skills
-                let brickIndex = 0;
-                let skillIndex = 0;
-                for(let c = 0; c < brickColumnCount; c++) {
-                    for(let r = 0; r < brickRowCount; r++) {
-                        const hasSkill = skillPositions.includes(brickIndex);
-                        bricks[c][r] = { 
-                            x: 0, 
-                            y: 0, 
-                            status: 1, 
-                            skill: hasSkill ? skills[skillIndex++ % skills.length] : null,
-                            color: hasSkill ? pastelColors[Math.floor(Math.random() * pastelColors.length)] : "#CCCCCC"
-                        };
-                        brickIndex++;
-                    }
-                }
-                
                 draw();
             }
         });
+
+        canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    droneX = mouseX - droneWidth / 2;
+    
+    // Ensure the drone stays within the flight zone
+    droneX = Math.max(flightZoneX, Math.min(droneX, flightZoneX + flightZoneWidth - droneWidth));
+});
 
         function contactFlorian() {
             window.location.href = "mailto:Florian.Bahr@gmx.de?subject=Sie sind eingestellt!";
@@ -455,8 +629,9 @@
             canvas.height = window.innerHeight;
         });
 
+        document.addEventListener('keydown', handleKeyDown);
+
         draw();
     </script>
 </body>
 </html>
-</antArt
