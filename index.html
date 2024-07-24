@@ -450,16 +450,15 @@
         }
 
         function loadLeaderboard() {
-            const leaderboardRef = database.ref('leaderboard').orderByChild('score').limitToLast(10);
-            leaderboardRef.once('value').then((snapshot) => {
-                const leaderboardData = [];
-                snapshot.forEach((childSnapshot) => {
-                    leaderboardData.unshift(childSnapshot.val());
-                });
-                displayLeaderboard(leaderboardData);
-            }).catch(error => console.error("Error loading leaderboard:", error));
-        }
-
+    const leaderboardRef = database.ref('leaderboard').orderByChild('score');
+    leaderboardRef.once('value').then((snapshot) => {
+        const leaderboardData = [];
+        snapshot.forEach((childSnapshot) => {
+            leaderboardData.unshift(childSnapshot.val());
+        });
+        displayLeaderboard(leaderboardData);
+    }).catch(error => console.error("Error loading leaderboard:", error));
+}
         function updateLeaderboard(company, score) {
             database.ref('leaderboard').push({
                 company: company,
@@ -468,40 +467,40 @@
         }
 
         function displayLeaderboard(leaderboardData) {
-            // Remove existing leaderboard if any
-            const existingLeaderboard = document.getElementById('leaderboardContainer');
-            if (existingLeaderboard) existingLeaderboard.remove();
+    // Remove existing leaderboard if any
+    const existingLeaderboard = document.getElementById('leaderboardContainer');
+    if (existingLeaderboard) existingLeaderboard.remove();
 
-            const leaderboardContainer = document.createElement('div');
-            leaderboardContainer.id = 'leaderboardContainer';
-            leaderboardContainer.style.cssText = `
-                position: absolute;
-                bottom: 20px;
-                right: 20px;
-                width: 300px;
-                height: 400px;
-                background-color: rgba(0, 0, 0, 0.8);
-                color: white;
-                padding: 20px;
-                overflow-y: auto;
-                display: flex;
-                flex-direction: column;
-            `;
+    const leaderboardContainer = document.createElement('div');
+    leaderboardContainer.id = 'leaderboardContainer';
+    leaderboardContainer.style.cssText = `
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 300px;
+        max-height: 400px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+    `;
 
-            const leaderboardTitle = document.createElement('h2');
-            leaderboardTitle.textContent = 'Leaderboard';
-            leaderboardContainer.appendChild(leaderboardTitle);
+    const leaderboardTitle = document.createElement('h2');
+    leaderboardTitle.textContent = 'Leaderboard';
+    leaderboardContainer.appendChild(leaderboardTitle);
 
-            const leaderboardList = document.createElement('ol');
-            leaderboardData.forEach(entry => {
-                const listItem = document.createElement('li');
-                listItem.textContent = `${entry.company}: ${entry.score}`;
-                leaderboardList.appendChild(listItem);
-            });
-            leaderboardContainer.appendChild(leaderboardList);
+    const leaderboardList = document.createElement('ol');
+    leaderboardData.forEach((entry, index) => {
+        const listItem = document.createElement('li');
+        listItem.textContent = `${entry.company}: ${entry.score}`;
+        leaderboardList.appendChild(listItem);
+    });
+    leaderboardContainer.appendChild(leaderboardList);
 
-            document.body.appendChild(leaderboardContainer);
-        }
+    document.body.appendChild(leaderboardContainer);
+}
 
         function draw() {
             if (gameOver) return;
